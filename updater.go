@@ -134,6 +134,44 @@ var CheckOnlyByTag = func(owner, repo, currentVersion string) error {
 	return CheckOnly(owner, repo, channel, currentVersion, true, "")
 }
 
+// CheckForUpdatesHTTP is a variable for a function that checks for updates from a generic HTTP endpoint.
+var CheckForUpdatesHTTP = func(baseURL, currentVersion string) error {
+	info, err := GetLatestUpdateFromURL(baseURL)
+	if err != nil {
+		return err
+	}
+
+	vCurrent := formatVersionForComparison(currentVersion)
+	vLatest := formatVersionForComparison(info.Version)
+
+	if semver.Compare(vCurrent, vLatest) >= 0 {
+		fmt.Printf("Current version %s is up-to-date with latest release %s.\n", currentVersion, info.Version)
+		return nil
+	}
+
+	fmt.Printf("Newer version %s found (current: %s). Applying update...\n", info.Version, currentVersion)
+	return doUpdateFunc(info.URL)
+}
+
+// CheckOnlyHTTP is a variable for a function that checks for updates from a generic HTTP endpoint without applying them.
+var CheckOnlyHTTP = func(baseURL, currentVersion string) error {
+	info, err := GetLatestUpdateFromURL(baseURL)
+	if err != nil {
+		return err
+	}
+
+	vCurrent := formatVersionForComparison(currentVersion)
+	vLatest := formatVersionForComparison(info.Version)
+
+	if semver.Compare(vCurrent, vLatest) >= 0 {
+		fmt.Printf("Current version %s is up-to-date with latest release %s.\n", currentVersion, info.Version)
+		return nil
+	}
+
+	fmt.Printf("New release found: %s (current version: %s)\n", info.Version, currentVersion)
+	return nil
+}
+
 // formatVersionForComparison ensures the version string has a 'v' prefix for semver comparison.
 func formatVersionForComparison(version string) string {
 	if version != "" && !strings.HasPrefix(version, "v") {

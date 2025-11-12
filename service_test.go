@@ -1,6 +1,8 @@
 package updater
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -9,23 +11,24 @@ func TestNewUpdateService(t *testing.T) {
 		name        string
 		config      UpdateServiceConfig
 		expectError bool
+		isGitHub    bool
 	}{
 		{
-			name: "Valid config",
+			name: "Valid GitHub URL",
 			config: UpdateServiceConfig{
 				RepoURL: "https://github.com/owner/repo",
 			},
-			expectError: false,
+			isGitHub: true,
 		},
 		{
-			name: "Invalid repo URL",
+			name: "Valid non-GitHub URL",
 			config: UpdateServiceConfig{
-				RepoURL: "not-a-url",
+				RepoURL: "https://example.com/updates",
 			},
-			expectError: true,
+			isGitHub: false,
 		},
 		{
-			name: "Invalid repo path",
+			name: "Invalid GitHub URL",
 			config: UpdateServiceConfig{
 				RepoURL: "https://github.com/owner",
 			},
@@ -35,95 +38,132 @@ func TestNewUpdateService(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewUpdateService(tc.config)
+			service, err := NewUpdateService(tc.config)
 			if (err != nil) != tc.expectError {
 				t.Errorf("Expected error: %v, got: %v", tc.expectError, err)
+			}
+			if err == nil && service.isGitHub != tc.isGitHub {
+				t.Errorf("Expected isGitHub: %v, got: %v", tc.isGitHub, service.isGitHub)
 			}
 		})
 	}
 }
 
 func TestUpdateService_Start(t *testing.T) {
+	// Setup a mock server for HTTP tests
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"version": "v1.1.0", "url": "http://example.com/release.zip"}`))
+	}))
+	defer server.Close()
+
 	testCases := []struct {
-		name           string
-		config         UpdateServiceConfig
-		checkOnlyCalls int
-		checkAndDo     int
-		expectError    bool
+		name                string
+		config              UpdateServiceConfig
+		checkOnlyGitHub     int
+		checkAndDoGitHub    int
+		checkOnlyHTTPCalls  int
+		checkAndDoHTTPCalls int
+		expectError         bool
 	}{
 		{
-			name: "NoCheck",
+			name: "GitHub: NoCheck",
 			config: UpdateServiceConfig{
 				RepoURL:        "https://github.com/owner/repo",
 				CheckOnStartup: NoCheck,
 			},
 		},
 		{
-			name: "CheckOnStartup",
+			name: "GitHub: CheckOnStartup",
 			config: UpdateServiceConfig{
 				RepoURL:        "https://github.com/owner/repo",
 				CheckOnStartup: CheckOnStartup,
 			},
-			checkOnlyCalls: 1,
+			checkOnlyGitHub: 1,
 		},
 		{
-			name: "CheckAndUpdateOnStartup",
+			name: "GitHub: CheckAndUpdateOnStartup",
 			config: UpdateServiceConfig{
 				RepoURL:        "https://github.com/owner/repo",
 				CheckOnStartup: CheckAndUpdateOnStartup,
 			},
-			checkAndDo: 1,
+			checkAndDoGitHub: 1,
 		},
 		{
-			name: "Unknown mode",
+			name: "HTTP: NoCheck",
 			config: UpdateServiceConfig{
-				RepoURL:        "https://github.com/owner/repo",
-				CheckOnStartup: 99, // Invalid mode
+				RepoURL:        server.URL,
+				CheckOnStartup: NoCheck,
 			},
-			expectError: true,
+		},
+		{
+			name: "HTTP: CheckOnStartup",
+			config: UpdateServiceConfig{
+				RepoURL:        server.URL,
+				CheckOnStartup: CheckOnStartup,
+			},
+			checkOnlyHTTPCalls: 1,
+		},
+		{
+			name: "HTTP: CheckAndUpdateOnStartup",
+			config: UpdateServiceConfig{
+				RepoURL:        server.URL,
+				CheckOnStartup: CheckAndUpdateOnStartup,
+			},
+			checkAndDoHTTPCalls: 1,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var checkOnlyCalls, checkAndDoCalls int
+			var checkOnlyGitHub, checkAndDoGitHub, checkOnlyHTTP, checkAndDoHTTP int
 
-			// Mock the check functions
+			// Mock GitHub functions
 			originalCheckOnly := CheckOnly
 			CheckOnly = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool, releaseURLFormat string) error {
-				checkOnlyCalls++
+				checkOnlyGitHub++
 				return nil
 			}
 			defer func() { CheckOnly = originalCheckOnly }()
 
 			originalCheckForUpdates := CheckForUpdates
 			CheckForUpdates = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool, releaseURLFormat string) error {
-				checkAndDoCalls++
+				checkAndDoGitHub++
 				return nil
 			}
 			defer func() { CheckForUpdates = originalCheckForUpdates }()
 
-			service, err := NewUpdateService(tc.config)
-			if err != nil {
-				// This check is for NewUpdateService, not Start
-				if tc.name == "Invalid repo URL" || tc.name == "Invalid repo path" {
-					if tc.expectError {
-						return
-					}
-				}
-				t.Fatalf("Unexpected error creating service: %v", err)
+			// Mock HTTP functions
+			originalCheckOnlyHTTP := CheckOnlyHTTP
+			CheckOnlyHTTP = func(baseURL, currentVersion string) error {
+				checkOnlyHTTP++
+				return nil
 			}
+			defer func() { CheckOnlyHTTP = originalCheckOnlyHTTP }()
 
-			err = service.Start()
+			originalCheckForUpdatesHTTP := CheckForUpdatesHTTP
+			CheckForUpdatesHTTP = func(baseURL, currentVersion string) error {
+				checkAndDoHTTP++
+				return nil
+			}
+			defer func() { CheckForUpdatesHTTP = originalCheckForUpdatesHTTP }()
+
+			service, _ := NewUpdateService(tc.config)
+			err := service.Start()
+
 			if (err != nil) != tc.expectError {
 				t.Errorf("Expected error: %v, got: %v", tc.expectError, err)
 			}
-
-			if checkOnlyCalls != tc.checkOnlyCalls {
-				t.Errorf("Expected CheckOnly calls: %d, got: %d", tc.checkOnlyCalls, checkOnlyCalls)
+			if checkOnlyGitHub != tc.checkOnlyGitHub {
+				t.Errorf("Expected GitHub CheckOnly calls: %d, got: %d", tc.checkOnlyGitHub, checkOnlyGitHub)
 			}
-			if checkAndDoCalls != tc.checkAndDo {
-				t.Errorf("Expected CheckForUpdates calls: %d, got: %d", tc.checkAndDo, checkAndDoCalls)
+			if checkAndDoGitHub != tc.checkAndDoGitHub {
+				t.Errorf("Expected GitHub CheckForUpdates calls: %d, got: %d", tc.checkAndDoGitHub, checkAndDoGitHub)
+			}
+			if checkOnlyHTTP != tc.checkOnlyHTTPCalls {
+				t.Errorf("Expected HTTP CheckOnly calls: %d, got: %d", tc.checkOnlyHTTPCalls, checkOnlyHTTP)
+			}
+			if checkAndDoHTTP != tc.checkAndDoHTTPCalls {
+				t.Errorf("Expected HTTP CheckForUpdates calls: %d, got: %d", tc.checkAndDoHTTPCalls, checkAndDoHTTP)
 			}
 		})
 	}

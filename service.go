@@ -30,27 +30,42 @@ type UpdateServiceConfig struct {
 
 // UpdateService provides a configurable interface for handling application updates.
 type UpdateService struct {
-	config UpdateServiceConfig
-	owner  string
-	repo   string
+	config   UpdateServiceConfig
+	isGitHub bool
+	owner    string
+	repo     string
 }
 
 // NewUpdateService creates and configures a new UpdateService.
 func NewUpdateService(config UpdateServiceConfig) (*UpdateService, error) {
-	owner, repo, err := ParseRepoURL(config.RepoURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse repo URL: %w", err)
+	isGitHub := strings.Contains(config.RepoURL, "github.com")
+	var owner, repo string
+	var err error
+
+	if isGitHub {
+		owner, repo, err = ParseRepoURL(config.RepoURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse GitHub repo URL: %w", err)
+		}
 	}
 
 	return &UpdateService{
-		config: config,
-		owner:  owner,
-		repo:   repo,
+		config:   config,
+		isGitHub: isGitHub,
+		owner:    owner,
+		repo:     repo,
 	}, nil
 }
 
 // Start initiates the update check based on the service configuration.
 func (s *UpdateService) Start() error {
+	if s.isGitHub {
+		return s.startGitHubCheck()
+	}
+	return s.startHTTPCheck()
+}
+
+func (s *UpdateService) startGitHubCheck() error {
 	switch s.config.CheckOnStartup {
 	case NoCheck:
 		return nil // Do nothing
@@ -58,6 +73,19 @@ func (s *UpdateService) Start() error {
 		return CheckOnly(s.owner, s.repo, s.config.Channel, s.config.CurrentVersion, s.config.ForceSemVerPrefix, s.config.ReleaseURLFormat)
 	case CheckAndUpdateOnStartup:
 		return CheckForUpdates(s.owner, s.repo, s.config.Channel, s.config.CurrentVersion, s.config.ForceSemVerPrefix, s.config.ReleaseURLFormat)
+	default:
+		return fmt.Errorf("unknown startup check mode: %d", s.config.CheckOnStartup)
+	}
+}
+
+func (s *UpdateService) startHTTPCheck() error {
+	switch s.config.CheckOnStartup {
+	case NoCheck:
+		return nil // Do nothing
+	case CheckOnStartup:
+		return CheckOnlyHTTP(s.config.RepoURL, s.config.CurrentVersion)
+	case CheckAndUpdateOnStartup:
+		return CheckForUpdatesHTTP(s.config.RepoURL, s.config.CurrentVersion)
 	default:
 		return fmt.Errorf("unknown startup check mode: %d", s.config.CheckOnStartup)
 	}
