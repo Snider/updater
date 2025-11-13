@@ -204,6 +204,10 @@ func TestCheckForNewerVersion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			originalVersion := Version
+			Version = tc.currentVersion
+			defer func() { Version = originalVersion }()
+
 			mockClient := &MockGithubClient{}
 			if tc.GetLatestReleaseFunc != nil {
 				mockClient.GetLatestReleaseFunc = tc.GetLatestReleaseFunc
@@ -218,7 +222,7 @@ func TestCheckForNewerVersion(t *testing.T) {
 			NewGithubClient = func() GithubClient { return mockClient }
 			defer func() { NewGithubClient = originalNewGithubClient }()
 
-			_, updateAvailable, err := CheckForNewerVersion("owner", "repo", tc.channel, tc.currentVersion, tc.forceSemVerPrefix)
+			_, updateAvailable, err := CheckForNewerVersion("owner", "repo", tc.channel, tc.forceSemVerPrefix)
 
 			if (err != nil) != tc.expectError {
 				t.Errorf("Expected error: %v, got: %v", tc.expectError, err)
@@ -360,6 +364,10 @@ func TestCheckForUpdates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			originalVersion := Version
+			Version = tc.currentVersion
+			defer func() { Version = originalVersion }()
+
 			mockClient := &MockGithubClient{
 				GetLatestReleaseFunc: func(ctx context.Context, owner, repo, channel string) (*Release, error) {
 					if tc.expectError && tc.mockRelease == nil {
@@ -380,7 +388,7 @@ func TestCheckForUpdates(t *testing.T) {
 			}
 			defer func() { doUpdateFunc = originalDoUpdateFunc }()
 
-			err := CheckForUpdates("owner", "repo", tc.channel, tc.currentVersion, tc.forceSemVerPrefix, tc.releaseURLFormat)
+			err := CheckForUpdates("owner", "repo", tc.channel, tc.forceSemVerPrefix, tc.releaseURLFormat)
 
 			if (err != nil) != tc.expectError {
 				t.Errorf("Expected error: %v, got: %v", tc.expectError, err)
@@ -431,6 +439,10 @@ func TestCheckOnly(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			originalVersion := Version
+			Version = tc.currentVersion
+			defer func() { Version = originalVersion }()
+
 			mockClient := &MockGithubClient{
 				GetLatestReleaseFunc: func(ctx context.Context, owner, repo, channel string) (*Release, error) {
 					if tc.expectError && tc.mockRelease == nil {
@@ -443,7 +455,7 @@ func TestCheckOnly(t *testing.T) {
 			NewGithubClient = func() GithubClient { return mockClient }
 			defer func() { NewGithubClient = originalNewGithubClient }()
 
-			err := CheckOnly("owner", "repo", tc.channel, tc.currentVersion, tc.forceSemVerPrefix, tc.releaseURLFormat)
+			err := CheckOnly("owner", "repo", tc.channel, tc.forceSemVerPrefix, tc.releaseURLFormat)
 
 			if (err != nil) != tc.expectError {
 				t.Errorf("Expected error: %v, got: %v", tc.expectError, err)

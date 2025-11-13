@@ -12,10 +12,8 @@ var (
 	checkUpdate        bool
 	doUpdate           bool
 	channel            string
-	currentVersionFlag string
 	forceSemVerPrefix  bool
 	releaseURLFormat   string
-	version            = "dev" // Default version, will be overridden by ldflags
 )
 
 var rootCmd = &cobra.Command{
@@ -24,12 +22,6 @@ var rootCmd = &cobra.Command{
 	Long:  `A demo CLI application showcasing the self-update functionality using GitHub releases.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		repoURL := "https://github.com/snider/updater"
-
-		// Use the flag if provided, otherwise use the embedded version
-		currentVersion := version
-		if currentVersionFlag != "" {
-			currentVersion = currentVersionFlag
-		}
 
 		// If a channel is specified, use the service-based approach
 		if channel != "" {
@@ -46,7 +38,6 @@ var rootCmd = &cobra.Command{
 			config := updater.UpdateServiceConfig{
 				RepoURL:           repoURL,
 				Channel:           channel,
-				CurrentVersion:    currentVersion,
 				CheckOnStartup:    startupMode,
 				ForceSemVerPrefix: forceSemVerPrefix,
 				ReleaseURLFormat:  releaseURLFormat,
@@ -73,12 +64,12 @@ var rootCmd = &cobra.Command{
 		}
 
 		if doUpdate {
-			if err := updater.CheckForUpdatesByTag(owner, repo, currentVersion); err != nil {
+			if err := updater.CheckForUpdatesByTag(owner, repo); err != nil {
 				fmt.Printf("Error performing update: %v\n", err)
 				os.Exit(1)
 			}
 		} else if checkUpdate {
-			if err := updater.CheckOnlyByTag(owner, repo, currentVersion); err != nil {
+			if err := updater.CheckOnlyByTag(owner, repo); err != nil {
 				fmt.Printf("Error checking for updates: %v\n", err)
 				os.Exit(1)
 			}
@@ -86,7 +77,7 @@ var rootCmd = &cobra.Command{
 			cmd.Println(cmd.Version)
 		}
 	},
-	Version: version, // Set the version for the command
+	Version: updater.Version,
 }
 
 func Execute() {
@@ -101,7 +92,6 @@ func init() {
 	rootCmd.Flags().BoolVar(&checkUpdate, "check-update", false, "Check for new updates")
 	rootCmd.Flags().BoolVar(&doUpdate, "do-update", false, "Perform an update")
 	rootCmd.Flags().StringVar(&channel, "channel", "", "Set the update channel (stable, beta, alpha). If not set, it's determined from the version tag.")
-	rootCmd.Flags().StringVar(&currentVersionFlag, "current-version", "", "Override the current version for testing")
 	rootCmd.Flags().BoolVar(&forceSemVerPrefix, "force-semver-prefix", true, "Force 'v' prefix on semver tags")
 	rootCmd.Flags().StringVar(&releaseURLFormat, "release-url-format", "", "A URL format for release assets, with {os}, {arch}, and {tag} as placeholders")
 }

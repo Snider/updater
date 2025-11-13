@@ -2,20 +2,31 @@
 
 BINARY_NAME=updater
 CMD_PATH=./cmd/updater
-VERSION ?= $(shell git describe --tags --always)
-LDFLAGS = -ldflags "-X 'github.com/snider/updater/cmd.version=$(VERSION)'"
 
-build:
-	@echo "Building $(BINARY_NAME) version $(VERSION)..."
-	@go build $(LDFLAGS) -o $(BINARY_NAME) $(CMD_PATH)/main.go
+# Default LDFLAGS to empty
+LDFLAGS = ""
+
+# If VERSION is set, override LDFLAGS
+ifdef VERSION
+	LDFLAGS = -ldflags "-X 'github.com/snider/updater.Version=$(VERSION)'"
+endif
+
+.PHONY: generate
+generate:
+	@echo "Generating code..."
+	@go generate ./...
+
+build: generate
+	@echo "Building $(BINARY_NAME)..."
+	@cd $(CMD_PATH) && go build $(LDFLAGS)
 
 dev: build
 	@echo "Running $(BINARY_NAME)..."
-	@./$(BINARY_NAME) --check-update 
+	@$(CMD_PATH)/$(BINARY_NAME) --check-update
 
 release-local:
 	@echo "Running local release with GoReleaser..."
-	@goreleaser release --snapshot --rm-dist
+	@~/go/bin/goreleaser release --snapshot --clean
 
 test:
 	@echo "Running tests..."

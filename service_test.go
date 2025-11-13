@@ -119,14 +119,14 @@ func TestUpdateService_Start(t *testing.T) {
 
 			// Mock GitHub functions
 			originalCheckOnly := CheckOnly
-			CheckOnly = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool, releaseURLFormat string) error {
+			CheckOnly = func(owner, repo, channel string, forceSemVerPrefix bool, releaseURLFormat string) error {
 				checkOnlyGitHub++
 				return nil
 			}
 			defer func() { CheckOnly = originalCheckOnly }()
 
 			originalCheckForUpdates := CheckForUpdates
-			CheckForUpdates = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool, releaseURLFormat string) error {
+			CheckForUpdates = func(owner, repo, channel string, forceSemVerPrefix bool, releaseURLFormat string) error {
 				checkAndDoGitHub++
 				return nil
 			}
@@ -134,14 +134,14 @@ func TestUpdateService_Start(t *testing.T) {
 
 			// Mock HTTP functions
 			originalCheckOnlyHTTP := CheckOnlyHTTP
-			CheckOnlyHTTP = func(baseURL, currentVersion string) error {
+			CheckOnlyHTTP = func(baseURL string) error {
 				checkOnlyHTTP++
 				return nil
 			}
 			defer func() { CheckOnlyHTTP = originalCheckOnlyHTTP }()
 
 			originalCheckForUpdatesHTTP := CheckForUpdatesHTTP
-			CheckForUpdatesHTTP = func(baseURL, currentVersion string) error {
+			CheckForUpdatesHTTP = func(baseURL string) error {
 				checkAndDoHTTP++
 				return nil
 			}
