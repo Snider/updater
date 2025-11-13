@@ -36,10 +36,9 @@ func TestRootCmd(t *testing.T) {
 		root.Flags().BoolVar(&checkUpdate, "check-update", false, "Check for new updates")
 		root.Flags().BoolVar(&doUpdate, "do-update", false, "Perform an update")
 		root.Flags().StringVar(&channel, "channel", "", "Set the update channel (stable, beta, alpha). If not set, it's determined from the version tag.")
-		root.Flags().StringVar(&currentVersionFlag, "current-version", "", "Override the current version for testing")
 		root.Flags().BoolVar(&forceSemVerPrefix, "force-semver-prefix", true, "Force 'v' prefix on semver tags")
 		root.Flags().StringVar(&releaseURLFormat, "release-url-format", "", "A URL format for release assets, with {os}, {arch}, and {tag} as placeholders")
-		root.Version = version
+		root.Version = updater.Version
 		return root
 	}
 
@@ -56,7 +55,7 @@ func TestRootCmd(t *testing.T) {
 		{
 			name:         "No flags (prints version)",
 			args:         []string{},
-			expectOutput: "dev", // Default version
+			expectOutput: "1.2.3", // Default version
 		},
 		{
 			name:           "check-update flag with channel",
@@ -81,7 +80,7 @@ func TestRootCmd(t *testing.T) {
 		{
 			name:         "Version flag",
 			args:         []string{"--version"},
-			expectOutput: "updater version dev",
+			expectOutput: "updater version 1.2.3",
 		},
 		{
 			name:        "Invalid flag",
@@ -96,28 +95,28 @@ func TestRootCmd(t *testing.T) {
 
 			// Mock the updater functions
 			originalCheckOnly := updater.CheckOnly
-			updater.CheckOnly = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool, releaseURLFormat string) error {
+			updater.CheckOnly = func(owner, repo, channel string, forceSemVerPrefix bool, releaseURLFormat string) error {
 				checkOnlyCalls++
 				return nil
 			}
 			defer func() { updater.CheckOnly = originalCheckOnly }()
 
 			originalCheckForUpdates := updater.CheckForUpdates
-			updater.CheckForUpdates = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool, releaseURLFormat string) error {
+			updater.CheckForUpdates = func(owner, repo, channel string, forceSemVerPrefix bool, releaseURLFormat string) error {
 				checkAndDoCalls++
 				return nil
 			}
 			defer func() { updater.CheckForUpdates = originalCheckForUpdates }()
 
 			originalCheckOnlyByTag := updater.CheckOnlyByTag
-			updater.CheckOnlyByTag = func(owner, repo, currentVersion string) error {
+			updater.CheckOnlyByTag = func(owner, repo string) error {
 				checkOnlyByTagCalls++
 				return nil
 			}
 			defer func() { updater.CheckOnlyByTag = originalCheckOnlyByTag }()
 
 			originalCheckForUpdatesByTag := updater.CheckForUpdatesByTag
-			updater.CheckForUpdatesByTag = func(owner, repo, currentVersion string) error {
+			updater.CheckForUpdatesByTag = func(owner, repo string) error {
 				checkAndDoByTagCalls++
 				return nil
 			}

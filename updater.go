@@ -11,6 +11,10 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+// Version holds the current version of the application.
+// It is set at build time via ldflags or fallback to the version in package.json.
+var Version = PkgVersion
+
 // NewGithubClient is a variable that holds a function to create a new GithubClient.
 // This can be replaced in tests to inject a mock client.
 var NewGithubClient = func() GithubClient {
@@ -44,7 +48,7 @@ var doUpdateFunc = func(url string) error {
 }
 
 // CheckForNewerVersion is a variable for a function that checks if a newer version is available.
-var CheckForNewerVersion = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool) (*Release, bool, error) {
+var CheckForNewerVersion = func(owner, repo, channel string, forceSemVerPrefix bool) (*Release, bool, error) {
 	client := NewGithubClient()
 	ctx := context.Background()
 
@@ -58,7 +62,7 @@ var CheckForNewerVersion = func(owner, repo, channel, currentVersion string, for
 	}
 
 	// Always normalize to 'v' prefix for semver comparison
-	vCurrent := formatVersionForComparison(currentVersion)
+	vCurrent := formatVersionForComparison(Version)
 	vLatest := formatVersionForComparison(release.TagName)
 
 	if semver.Compare(vCurrent, vLatest) >= 0 {
@@ -69,8 +73,8 @@ var CheckForNewerVersion = func(owner, repo, channel, currentVersion string, for
 }
 
 // CheckForUpdates is a variable for a function that checks for and applies new updates.
-var CheckForUpdates = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool, releaseURLFormat string) error {
-	release, updateAvailable, err := CheckForNewerVersion(owner, repo, channel, currentVersion, forceSemVerPrefix)
+var CheckForUpdates = func(owner, repo, channel string, forceSemVerPrefix bool, releaseURLFormat string) error {
+	release, updateAvailable, err := CheckForNewerVersion(owner, repo, channel, forceSemVerPrefix)
 	if err != nil {
 		return err
 	}
@@ -78,7 +82,7 @@ var CheckForUpdates = func(owner, repo, channel, currentVersion string, forceSem
 	if !updateAvailable {
 		if release != nil {
 			fmt.Printf("Current version %s is up-to-date with latest release %s.\n",
-				formatVersionForDisplay(currentVersion, forceSemVerPrefix),
+				formatVersionForDisplay(Version, forceSemVerPrefix),
 				formatVersionForDisplay(release.TagName, forceSemVerPrefix))
 		} else {
 			fmt.Println("No releases found.")
@@ -88,7 +92,7 @@ var CheckForUpdates = func(owner, repo, channel, currentVersion string, forceSem
 
 	fmt.Printf("Newer version %s found (current: %s). Applying update...\n",
 		formatVersionForDisplay(release.TagName, forceSemVerPrefix),
-		formatVersionForDisplay(currentVersion, forceSemVerPrefix))
+		formatVersionForDisplay(Version, forceSemVerPrefix))
 
 	downloadURL, err := GetDownloadURL(release, releaseURLFormat)
 	if err != nil {
@@ -99,8 +103,8 @@ var CheckForUpdates = func(owner, repo, channel, currentVersion string, forceSem
 }
 
 // CheckOnly is a variable for a function that checks for new updates without applying them.
-var CheckOnly = func(owner, repo, channel, currentVersion string, forceSemVerPrefix bool, releaseURLFormat string) error {
-	release, updateAvailable, err := CheckForNewerVersion(owner, repo, channel, currentVersion, forceSemVerPrefix)
+var CheckOnly = func(owner, repo, channel string, forceSemVerPrefix bool, releaseURLFormat string) error {
+	release, updateAvailable, err := CheckForNewerVersion(owner, repo, channel, forceSemVerPrefix)
 	if err != nil {
 		return err
 	}
@@ -108,7 +112,7 @@ var CheckOnly = func(owner, repo, channel, currentVersion string, forceSemVerPre
 	if !updateAvailable {
 		if release != nil {
 			fmt.Printf("Current version %s is up-to-date with latest release %s.\n",
-				formatVersionForDisplay(currentVersion, forceSemVerPrefix),
+				formatVersionForDisplay(Version, forceSemVerPrefix),
 				formatVersionForDisplay(release.TagName, forceSemVerPrefix))
 		} else {
 			fmt.Println("No new release found.")
@@ -118,57 +122,57 @@ var CheckOnly = func(owner, repo, channel, currentVersion string, forceSemVerPre
 
 	fmt.Printf("New release found: %s (current version: %s)\n",
 		formatVersionForDisplay(release.TagName, forceSemVerPrefix),
-		formatVersionForDisplay(currentVersion, forceSemVerPrefix))
+		formatVersionForDisplay(Version, forceSemVerPrefix))
 	return nil
 }
 
 // CheckForUpdatesByTag is a variable for a function that checks for updates based on the channel determined by the current version tag.
-var CheckForUpdatesByTag = func(owner, repo, currentVersion string) error {
-	channel := determineChannel(currentVersion, false) // isPreRelease is false for current version
-	return CheckForUpdates(owner, repo, channel, currentVersion, true, "")
+var CheckForUpdatesByTag = func(owner, repo string) error {
+	channel := determineChannel(Version, false) // isPreRelease is false for current version
+	return CheckForUpdates(owner, repo, channel, true, "")
 }
 
 // CheckOnlyByTag is a variable for a function that checks for updates based on the channel determined by the current version tag, without applying them.
-var CheckOnlyByTag = func(owner, repo, currentVersion string) error {
-	channel := determineChannel(currentVersion, false) // isPreRelease is false for current version
-	return CheckOnly(owner, repo, channel, currentVersion, true, "")
+var CheckOnlyByTag = func(owner, repo string) error {
+	channel := determineChannel(Version, false) // isPreRelease is false for current version
+	return CheckOnly(owner, repo, channel, true, "")
 }
 
 // CheckForUpdatesHTTP is a variable for a function that checks for updates from a generic HTTP endpoint.
-var CheckForUpdatesHTTP = func(baseURL, currentVersion string) error {
+var CheckForUpdatesHTTP = func(baseURL string) error {
 	info, err := GetLatestUpdateFromURL(baseURL)
 	if err != nil {
 		return err
 	}
 
-	vCurrent := formatVersionForComparison(currentVersion)
+	vCurrent := formatVersionForComparison(Version)
 	vLatest := formatVersionForComparison(info.Version)
 
 	if semver.Compare(vCurrent, vLatest) >= 0 {
-		fmt.Printf("Current version %s is up-to-date with latest release %s.\n", currentVersion, info.Version)
+		fmt.Printf("Current version %s is up-to-date with latest release %s.\n", Version, info.Version)
 		return nil
 	}
 
-	fmt.Printf("Newer version %s found (current: %s). Applying update...\n", info.Version, currentVersion)
+	fmt.Printf("Newer version %s found (current: %s). Applying update...\n", info.Version, Version)
 	return doUpdateFunc(info.URL)
 }
 
 // CheckOnlyHTTP is a variable for a function that checks for updates from a generic HTTP endpoint without applying them.
-var CheckOnlyHTTP = func(baseURL, currentVersion string) error {
+var CheckOnlyHTTP = func(baseURL string) error {
 	info, err := GetLatestUpdateFromURL(baseURL)
 	if err != nil {
 		return err
 	}
 
-	vCurrent := formatVersionForComparison(currentVersion)
+	vCurrent := formatVersionForComparison(Version)
 	vLatest := formatVersionForComparison(info.Version)
 
 	if semver.Compare(vCurrent, vLatest) >= 0 {
-		fmt.Printf("Current version %s is up-to-date with latest release %s.\n", currentVersion, info.Version)
+		fmt.Printf("Current version %s is up-to-date with latest release %s.\n", Version, info.Version)
 		return nil
 	}
 
-	fmt.Printf("New release found: %s (current version: %s)\n", info.Version, currentVersion)
+	fmt.Printf("New release found: %s (current version: %s)\n", info.Version, Version)
 	return nil
 }
 

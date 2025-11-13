@@ -1,3 +1,4 @@
+//go:generate go run github.com/snider/updater/build
 package updater
 
 import (
@@ -22,7 +23,6 @@ const (
 type UpdateServiceConfig struct {
 	RepoURL           string
 	Channel           string
-	CurrentVersion    string
 	CheckOnStartup    StartupCheckMode
 	ForceSemVerPrefix bool   // If true, ensures 'v' prefix. If false, ensures no 'v' prefix.
 	ReleaseURLFormat  string // A URL format for release assets, with {tag} as a placeholder.
@@ -70,9 +70,9 @@ func (s *UpdateService) startGitHubCheck() error {
 	case NoCheck:
 		return nil // Do nothing
 	case CheckOnStartup:
-		return CheckOnly(s.owner, s.repo, s.config.Channel, s.config.CurrentVersion, s.config.ForceSemVerPrefix, s.config.ReleaseURLFormat)
+		return CheckOnly(s.owner, s.repo, s.config.Channel, s.config.ForceSemVerPrefix, s.config.ReleaseURLFormat)
 	case CheckAndUpdateOnStartup:
-		return CheckForUpdates(s.owner, s.repo, s.config.Channel, s.config.CurrentVersion, s.config.ForceSemVerPrefix, s.config.ReleaseURLFormat)
+		return CheckForUpdates(s.owner, s.repo, s.config.Channel, s.config.ForceSemVerPrefix, s.config.ReleaseURLFormat)
 	default:
 		return fmt.Errorf("unknown startup check mode: %d", s.config.CheckOnStartup)
 	}
@@ -83,9 +83,9 @@ func (s *UpdateService) startHTTPCheck() error {
 	case NoCheck:
 		return nil // Do nothing
 	case CheckOnStartup:
-		return CheckOnlyHTTP(s.config.RepoURL, s.config.CurrentVersion)
+		return CheckOnlyHTTP(s.config.RepoURL)
 	case CheckAndUpdateOnStartup:
-		return CheckForUpdatesHTTP(s.config.RepoURL, s.config.CurrentVersion)
+		return CheckForUpdatesHTTP(s.config.RepoURL)
 	default:
 		return fmt.Errorf("unknown startup check mode: %d", s.config.CheckOnStartup)
 	}
