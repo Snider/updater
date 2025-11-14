@@ -27,9 +27,9 @@ var NewGithubClient = func() GithubClient {
 	return &githubClient{}
 }
 
-// doUpdateFunc is a variable that holds the function to perform the actual update.
+// DoUpdate is a variable that holds the function to perform the actual update.
 // This can be replaced in tests to prevent actual updates.
-var doUpdateFunc = func(url string) error {
+var DoUpdate = func(url string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -56,27 +56,6 @@ var doUpdateFunc = func(url string) error {
 // CheckForNewerVersion checks if a newer version of the application is available on GitHub.
 // It fetches the latest release for the given owner, repository, and channel, and compares its tag
 // with the current application version.
-//
-// Parameters:
-//   - owner: The owner of the GitHub repository.
-//   - repo: The name of the GitHub repository.
-//   - channel: The release channel to check (e.g., "stable", "prerelease").
-//   - forceSemVerPrefix: If true, ensures the version tag starts with 'v' for comparison.
-//
-// Returns:
-//   - A pointer to the latest Release if found.
-//   - A boolean indicating if a newer version is available.
-//   - An error if the check fails.
-//
-// Example:
-//
-//	release, available, err := updater.CheckForNewerVersion("owner", "repo", "stable", true)
-//	if err != nil {
-//		// handle error
-//	}
-//	if available {
-//		fmt.Printf("New release found: %s\n", release.TagName)
-//	}
 var CheckForNewerVersion = func(owner, repo, channel string, forceSemVerPrefix bool) (*Release, bool, error) {
 	client := NewGithubClient()
 	ctx := context.Background()
@@ -103,20 +82,6 @@ var CheckForNewerVersion = func(owner, repo, channel string, forceSemVerPrefix b
 
 // CheckForUpdates checks for new updates on GitHub and applies them if a newer version is found.
 // It uses the provided owner, repository, and channel to find the latest release.
-//
-// Parameters:
-//   - owner: The owner of the GitHub repository.
-//   - repo: The name of the GitHub repository.
-//   - channel: The release channel to check.
-//   - forceSemVerPrefix: Toggles the 'v' prefix on the version tag for display.
-//   - releaseURLFormat: A format string for the release download URL, with {tag} as a placeholder.
-//
-// Example:
-//
-//	err := updater.CheckForUpdates("owner", "repo", "stable", true, "")
-//	if err != nil {
-//		// handle error
-//	}
 var CheckForUpdates = func(owner, repo, channel string, forceSemVerPrefix bool, releaseURLFormat string) error {
 	release, updateAvailable, err := CheckForNewerVersion(owner, repo, channel, forceSemVerPrefix)
 	if err != nil {
@@ -143,25 +108,11 @@ var CheckForUpdates = func(owner, repo, channel string, forceSemVerPrefix bool, 
 		return fmt.Errorf("error getting download URL: %w", err)
 	}
 
-	return doUpdateFunc(downloadURL)
+	return DoUpdate(downloadURL)
 }
 
 // CheckOnly checks for new updates on GitHub without applying them.
 // It prints a message indicating if a new release is available.
-//
-// Parameters:
-//   - owner: The owner of the GitHub repository.
-//   - repo: The name of the GitHub repository.
-//   - channel: The release channel to check.
-//   - forceSemVerPrefix: Toggles the 'v' prefix on the version tag for display.
-//   - releaseURLFormat: A format string for the release download URL.
-//
-// Example:
-//
-//	err := updater.CheckOnly("owner", "repo", "stable", true, "")
-//	if err != nil {
-//		// handle error
-//	}
 var CheckOnly = func(owner, repo, channel string, forceSemVerPrefix bool, releaseURLFormat string) error {
 	release, updateAvailable, err := CheckForNewerVersion(owner, repo, channel, forceSemVerPrefix)
 	if err != nil {
@@ -187,17 +138,6 @@ var CheckOnly = func(owner, repo, channel string, forceSemVerPrefix bool, releas
 
 // CheckForUpdatesByTag checks for and applies updates from GitHub based on the channel
 // determined by the current application's version tag (e.g., 'stable' or 'prerelease').
-//
-// Parameters:
-//   - owner: The owner of the GitHub repository.
-//   - repo: The name of the GitHub repository.
-//
-// Example:
-//
-//	err := updater.CheckForUpdatesByTag("owner", "repo")
-//	if err != nil {
-//		// handle error
-//	}
 var CheckForUpdatesByTag = func(owner, repo string) error {
 	channel := determineChannel(Version, false) // isPreRelease is false for current version
 	return CheckForUpdates(owner, repo, channel, true, "")
@@ -205,17 +145,6 @@ var CheckForUpdatesByTag = func(owner, repo string) error {
 
 // CheckOnlyByTag checks for updates from GitHub based on the channel determined by the
 // current version tag, without applying them.
-//
-// Parameters:
-//   - owner: The owner of the GitHub repository.
-//   - repo: The name of the GitHub repository.
-//
-// Example:
-//
-//	err := updater.CheckOnlyByTag("owner", "repo")
-//	if err != nil {
-//		// handle error
-//	}
 var CheckOnlyByTag = func(owner, repo string) error {
 	channel := determineChannel(Version, false) // isPreRelease is false for current version
 	return CheckOnly(owner, repo, channel, true, "")
@@ -223,19 +152,6 @@ var CheckOnlyByTag = func(owner, repo string) error {
 
 // CheckForUpdatesByPullRequest finds a release associated with a specific pull request number
 // on GitHub and applies the update.
-//
-// Parameters:
-//   - owner: The owner of the GitHub repository.
-//   - repo: The name of the GitHub repository.
-//   - prNumber: The pull request number to find the release for.
-//   - releaseURLFormat: A format string for the release download URL.
-//
-// Example:
-//
-//	err := updater.CheckForUpdatesByPullRequest("owner", "repo", 123, "")
-//	if err != nil {
-//		// handle error
-//	}
 var CheckForUpdatesByPullRequest = func(owner, repo string, prNumber int, releaseURLFormat string) error {
 	client := NewGithubClient()
 	ctx := context.Background()
@@ -257,23 +173,11 @@ var CheckForUpdatesByPullRequest = func(owner, repo string, prNumber int, releas
 		return fmt.Errorf("error getting download URL: %w", err)
 	}
 
-	return doUpdateFunc(downloadURL)
+	return DoUpdate(downloadURL)
 }
 
 // CheckForUpdatesHTTP checks for and applies updates from a generic HTTP endpoint.
 // The endpoint is expected to provide update information in a structured format.
-//
-// See GetLatestUpdateFromURL for the expected JSON format.
-//
-// Parameters:
-//   - baseURL: The base URL of the update server.
-//
-// Example:
-//
-//	err := updater.CheckForUpdatesHTTP("https://my-update-server.com")
-//	if err != nil {
-//		// handle error
-//	}
 var CheckForUpdatesHTTP = func(baseURL string) error {
 	info, err := GetLatestUpdateFromURL(baseURL)
 	if err != nil {
@@ -289,23 +193,11 @@ var CheckForUpdatesHTTP = func(baseURL string) error {
 	}
 
 	fmt.Printf("Newer version %s found (current: %s). Applying update...\n", info.Version, Version)
-	return doUpdateFunc(info.URL)
+	return DoUpdate(info.URL)
 }
 
 // CheckOnlyHTTP checks for updates from a generic HTTP endpoint without applying them.
 // It prints a message if a new version is available.
-//
-// See GetLatestUpdateFromURL for the expected JSON format.
-//
-// Parameters:
-//   - baseURL: The base URL of the update server.
-//
-// Example:
-//
-//	err := updater.CheckOnlyHTTP("https://my-update-server.com")
-//	if err != nil {
-//		// handle error
-//	}
 var CheckOnlyHTTP = func(baseURL string) error {
 	info, err := GetLatestUpdateFromURL(baseURL)
 	if err != nil {
