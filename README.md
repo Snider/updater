@@ -34,6 +34,80 @@ npm run build
 
 This will create a single JavaScript file in the `dist` directory that you can use in any HTML page.
 
+## Usage
+
+To use the updater library in your Go project, you can use the `UpdateService`.
+
+### GitHub-based Updates
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/snider/updater"
+)
+
+func main() {
+	config := updater.UpdateServiceConfig{
+		RepoURL:        "https://github.com/owner/repo",
+		Channel:        "stable",
+		CheckOnStartup: updater.CheckAndUpdateOnStartup,
+	}
+
+	updateService, err := updater.NewUpdateService(config)
+	if err != nil {
+		log.Fatalf("Failed to create update service: %v", err)
+	}
+
+	if err := updateService.Start(); err != nil {
+		fmt.Printf("Update check failed: %v\n", err)
+	}
+}
+```
+
+### Generic HTTP Updates
+
+For updates from a generic HTTP server, the server should provide a `latest.json` file at the root of the `RepoURL`. The JSON file should have the following structure:
+
+```json
+{
+  "version": "1.2.3",
+  "url": "https://your-server.com/path/to/release-asset"
+}
+```
+
+You can then configure the `UpdateService` as follows:
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/snider/updater"
+)
+
+func main() {
+	config := updater.UpdateServiceConfig{
+		RepoURL:        "https://your-server.com",
+		CheckOnStartup: updater.CheckAndUpdateOnStartup,
+	}
+
+	updateService, err := updater.NewUpdateService(config)
+	if err != nil {
+		log.Fatalf("Failed to create update service: %v", err)
+	}
+
+	if err := updateService.Start(); err != nil {
+		fmt.Printf("Update check failed: %v\n", err)
+	}
+}
+```
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

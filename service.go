@@ -1,4 +1,7 @@
 //go:generate go run github.com/snider/updater/build
+
+// Package updater provides functionality for self-updating Go applications.
+// It supports updates from GitHub releases and generic HTTP endpoints.
 package updater
 
 import (
@@ -21,14 +24,24 @@ const (
 
 // UpdateServiceConfig holds the configuration for the UpdateService.
 type UpdateServiceConfig struct {
-	RepoURL           string
-	Channel           string
-	CheckOnStartup    StartupCheckMode
-	ForceSemVerPrefix bool   // If true, ensures 'v' prefix. If false, ensures no 'v' prefix.
-	ReleaseURLFormat  string // A URL format for release assets, with {tag} as a placeholder.
+	// RepoURL is the URL to the repository for updates.
+	// It can be a GitHub repository URL (e.g., "https://github.com/owner/repo")
+	// or a base URL for a generic HTTP update server.
+	RepoURL string
+	// Channel specifies the release channel to track (e.g., "stable", "prerelease").
+	// This is only used for GitHub-based updates.
+	Channel string
+	// CheckOnStartup determines the update behavior when the service starts.
+	CheckOnStartup StartupCheckMode
+	// ForceSemVerPrefix toggles whether to enforce a 'v' prefix on version tags for display.
+	ForceSemVerPrefix bool // If true, ensures 'v' prefix. If false, ensures no 'v' prefix.
+	// ReleaseURLFormat provides a template for constructing the download URL for a release asset.
+	// The placeholder {tag} will be replaced with the release tag.
+	ReleaseURLFormat string // A URL format for release assets, with {tag} as a placeholder.
 }
 
 // UpdateService provides a configurable interface for handling application updates.
+// It can be configured to check for updates on startup and apply them automatically.
 type UpdateService struct {
 	config   UpdateServiceConfig
 	isGitHub bool
@@ -37,6 +50,21 @@ type UpdateService struct {
 }
 
 // NewUpdateService creates and configures a new UpdateService.
+// It parses the repository URL to determine if it's a GitHub repository
+// and extracts the owner and repo name.
+//
+// Example:
+//
+//	config := updater.UpdateServiceConfig{
+//		RepoURL:        "https://github.com/owner/repo",
+//		Channel:        "stable",
+//		CheckOnStartup: updater.CheckAndUpdateOnStartup,
+//	}
+//	updateService, err := updater.NewUpdateService(config)
+//	if err != nil {
+//		// handle error
+//	}
+//	updateService.Start()
 func NewUpdateService(config UpdateServiceConfig) (*UpdateService, error) {
 	isGitHub := strings.Contains(config.RepoURL, "github.com")
 	var owner, repo string
@@ -58,6 +86,9 @@ func NewUpdateService(config UpdateServiceConfig) (*UpdateService, error) {
 }
 
 // Start initiates the update check based on the service configuration.
+// It determines whether to perform a GitHub or HTTP-based update check
+// based on the RepoURL. The behavior of the check is controlled by the
+// CheckOnStartup setting in the configuration.
 func (s *UpdateService) Start() error {
 	if s.isGitHub {
 		return s.startGitHubCheck()
@@ -92,6 +123,15 @@ func (s *UpdateService) startHTTPCheck() error {
 }
 
 // ParseRepoURL extracts the owner and repository name from a GitHub URL.
+// It handles standard GitHub URL formats.
+//
+// Example:
+//
+//	owner, repo, err := updater.ParseRepoURL("https://github.com/owner/repo")
+//	if err != nil {
+//		// handle error
+//	}
+//	fmt.Printf("Owner: %s, Repo: %s", owner, repo)
 func ParseRepoURL(repoURL string) (owner string, repo string, err error) {
 	u, err := url.Parse(repoURL)
 	if err != nil {
