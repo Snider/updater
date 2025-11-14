@@ -21,7 +21,7 @@ var Version = PkgVersion
 // Example:
 //
 //	updater.NewGithubClient = func() updater.GithubClient {
-//		// return mock client
+//		return &mockClient{} // or your mock implementation
 //	}
 var NewGithubClient = func() GithubClient {
 	return &githubClient{}
