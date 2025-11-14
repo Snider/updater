@@ -33,6 +33,7 @@ type Release struct {
 type GithubClient interface {
 	GetPublicRepos(ctx context.Context, userOrOrg string) ([]string, error)
 	GetLatestRelease(ctx context.Context, owner, repo, channel string) (*Release, error)
+	GetReleaseByPullRequest(ctx context.Context, owner, repo string, prNumber int) (*Release, error)
 }
 
 type githubClient struct{}
@@ -182,6 +183,43 @@ func determineChannel(tagName string, isPreRelease bool) string {
 		return "beta"
 	}
 	return "stable"
+}
+
+// GetReleaseByPullRequest fetches a release associated with a specific pull request number.
+func (g *githubClient) GetReleaseByPullRequest(ctx context.Context, owner, repo string, prNumber int) (*Release, error) {
+	client := NewAuthenticatedClient(ctx)
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", owner, repo)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Borg-Data-Collector")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch releases: %s", resp.Status)
+	}
+
+	var releases []Release
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, err
+	}
+
+	// The pr number is included in the tag name with the format `vX.Y.Z-alpha.pr.123` or `vX.Y.Z-beta.pr.123`
+	prTagSuffix := fmt.Sprintf(".pr.%d", prNumber)
+	for _, release := range releases {
+		if strings.Contains(release.TagName, prTagSuffix) {
+			return &release, nil
+		}
+	}
+
+	return nil, nil // No release found for the given PR number
 }
 
 // GetDownloadURL finds the appropriate download URL for the current OS and architecture.
