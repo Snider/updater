@@ -138,6 +138,31 @@ var CheckOnlyByTag = func(owner, repo string) error {
 	return CheckOnly(owner, repo, channel, true, "")
 }
 
+// CheckForUpdatesByPullRequest is a variable for a function that checks for and applies new updates based on a pull request number.
+var CheckForUpdatesByPullRequest = func(owner, repo string, prNumber int, releaseURLFormat string) error {
+	client := NewGithubClient()
+	ctx := context.Background()
+
+	release, err := client.GetReleaseByPullRequest(ctx, owner, repo, prNumber)
+	if err != nil {
+		return fmt.Errorf("error fetching release for pull request: %w", err)
+	}
+
+	if release == nil {
+		fmt.Printf("No release found for PR #%d.\n", prNumber)
+		return nil
+	}
+
+	fmt.Printf("Release %s found for PR #%d. Applying update...\n", release.TagName, prNumber)
+
+	downloadURL, err := GetDownloadURL(release, releaseURLFormat)
+	if err != nil {
+		return fmt.Errorf("error getting download URL: %w", err)
+	}
+
+	return doUpdateFunc(downloadURL)
+}
+
 // CheckForUpdatesHTTP is a variable for a function that checks for updates from a generic HTTP endpoint.
 var CheckForUpdatesHTTP = func(baseURL string) error {
 	info, err := GetLatestUpdateFromURL(baseURL)

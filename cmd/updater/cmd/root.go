@@ -14,6 +14,7 @@ var (
 	channel            string
 	forceSemVerPrefix  bool
 	releaseURLFormat   string
+	pullRequest        int
 )
 
 var rootCmd = &cobra.Command{
@@ -63,7 +64,12 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if doUpdate {
+		if pullRequest > 0 {
+			if err := updater.CheckForUpdatesByPullRequest(owner, repo, pullRequest, releaseURLFormat); err != nil {
+				fmt.Printf("Error performing update for PR: %v\n", err)
+				os.Exit(1)
+			}
+		} else if doUpdate {
 			if err := updater.CheckForUpdatesByTag(owner, repo); err != nil {
 				fmt.Printf("Error performing update: %v\n", err)
 				os.Exit(1)
@@ -94,4 +100,5 @@ func init() {
 	rootCmd.Flags().StringVar(&channel, "channel", "", "Set the update channel (stable, beta, alpha). If not set, it's determined from the version tag.")
 	rootCmd.Flags().BoolVar(&forceSemVerPrefix, "force-semver-prefix", true, "Force 'v' prefix on semver tags")
 	rootCmd.Flags().StringVar(&releaseURLFormat, "release-url-format", "", "A URL format for release assets, with {os}, {arch}, and {tag} as placeholders")
+	rootCmd.Flags().IntVar(&pullRequest, "pull-request", 0, "Update to a specific pull request")
 }
