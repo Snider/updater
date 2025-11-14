@@ -12,33 +12,40 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// Repo represents a repository from the GitHub API.
 type Repo struct {
-	CloneURL string `json:"clone_url"`
+	CloneURL string `json:"clone_url"` // The URL to clone the repository.
 }
 
-// ReleaseAsset represents a release asset from the GitHub API.
+// ReleaseAsset represents a single asset from a GitHub release.
 type ReleaseAsset struct {
-	Name        string `json:"name"`
-	DownloadURL string `json:"browser_download_url"`
+	Name        string `json:"name"`                  // The name of the asset.
+	DownloadURL string `json:"browser_download_url"` // The URL to download the asset.
 }
 
-// Release represents a release from the GitHub API.
+// Release represents a GitHub release.
 type Release struct {
-	TagName    string         `json:"tag_name"`
-	PreRelease bool           `json:"prerelease"`
-	Assets     []ReleaseAsset `json:"assets"`
+	TagName    string         `json:"tag_name"`    // The name of the tag for the release.
+	PreRelease bool           `json:"prerelease"`  // Indicates if the release is a pre-release.
+	Assets     []ReleaseAsset `json:"assets"`      // A list of assets associated with the release.
 }
 
-// GithubClient is an interface for interacting with the Github API.
+// GithubClient defines the interface for interacting with the GitHub API.
+// This allows for mocking the client in tests.
 type GithubClient interface {
+	// GetPublicRepos fetches the public repositories for a user or organization.
 	GetPublicRepos(ctx context.Context, userOrOrg string) ([]string, error)
+	// GetLatestRelease fetches the latest release for a given repository and channel.
 	GetLatestRelease(ctx context.Context, owner, repo, channel string) (*Release, error)
+	// GetReleaseByPullRequest fetches a release associated with a specific pull request number.
 	GetReleaseByPullRequest(ctx context.Context, owner, repo string, prNumber int) (*Release, error)
 }
 
 type githubClient struct{}
 
-// NewAuthenticatedClient creates a new authenticated http client.
+// NewAuthenticatedClient creates a new HTTP client that authenticates with the GitHub API.
+// It uses the GITHUB_TOKEN environment variable for authentication.
+// If the token is not set, it returns the default HTTP client.
 var NewAuthenticatedClient = func(ctx context.Context) *http.Client {
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
@@ -222,8 +229,41 @@ func (g *githubClient) GetReleaseByPullRequest(ctx context.Context, owner, repo 
 	return nil, nil // No release found for the given PR number
 }
 
-// GetDownloadURL finds the appropriate download URL for the current OS and architecture.
-// If a releaseURLFormat is provided, it will be used to construct the URL.
+// GetDownloadURL finds the appropriate download URL for the current operating system and architecture.
+//
+// It supports two modes of operation:
+//  1. Using a 'releaseURLFormat' template: If 'releaseURLFormat' is provided,
+//     it will be used to construct the download URL. The template can contain
+//     placeholders for the release tag '{tag}', operating system '{os}', and
+//     architecture '{arch}'.
+//  2. Automatic detection: If 'releaseURLFormat' is empty, the function will
+//     inspect the assets of the release to find a suitable download URL. It
+//     searches for an asset name that contains both the current OS and architecture
+//     (e.g., "my-app-linux-amd64"). If no match is found, it falls back to
+//     matching only the OS.
+//
+// Example with releaseURLFormat:
+//
+//	release := &updater.Release{TagName: "v1.2.3"}
+//	url, err := updater.GetDownloadURL(release, "https://example.com/downloads/{tag}/{os}/{arch}")
+//	if err != nil {
+//		// handle error
+//	}
+//	fmt.Println(url) // "https://example.com/downloads/v1.2.3/linux/amd64" (on a Linux AMD64 system)
+//
+// Example with automatic detection:
+//
+//	release := &updater.Release{
+//		Assets: []updater.ReleaseAsset{
+//			{Name: "my-app-linux-amd64", DownloadURL: "https://example.com/download/linux-amd64"},
+//			{Name: "my-app-windows-amd64", DownloadURL: "https://example.com/download/windows-amd64"},
+//		},
+//	}
+//	url, err := updater.GetDownloadURL(release, "")
+//	if err != nil {
+//		// handle error
+//	}
+//	fmt.Println(url) // "https://example.com/download/linux-amd64" (on a Linux AMD64 system)
 func GetDownloadURL(release *Release, releaseURLFormat string) (string, error) {
 	if release == nil {
 		return "", fmt.Errorf("no release provided")
